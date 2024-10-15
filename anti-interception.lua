@@ -1,27 +1,24 @@
-local function setupCollision(part)
-    if part:IsA("BasePart") then
-        local originalCanCollide = part.CanCollide
-        local partMT = getmetatable(part) or {}
-        setmetatable(part, {
-            __index = function(t, k)
-                return k == "CanCollide" and originalCanCollide or partMT.__index and partMT.__index(t, k) or rawget(t, k)
-            end,
-            __newindex = function(t, k, v)
-                if k == "CanCollide" then originalCanCollide = v else rawset(t, k, v) end
-            end
-        })
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local RawMetaTable = getrawmetatable(game)
+local OriginalNewIndex = RawMetaTable.__newindex
+local CallerCheck = checkcaller
+
+setreadonly(RawMetaTable, false)
+
+RawMetaTable.__newindex = newcclosure(function(self, propertyName, propertyValue)
+    if CallerCheck() then 
+        return OriginalNewIndex(self, propertyName, propertyValue) 
+    end 
+    
+    if tostring(self) == "HumanoidRootPart" or tostring(self) == "Torso" then 
+        if propertyName == "CFrame" and self:IsDescendantOf(LocalPlayer.Character) then 
+            return true 
+        end
     end
-end
+    
+    return OriginalNewIndex(self, propertyName, propertyValue)
+end)
 
-for _, part in pairs(workspace:GetDescendants()) do setupCollision(part) end
-workspace.DescendantAdded:Connect(setupCollision)
-
-local function modifyCollision(part, newCanCollide)
-    if part:IsA("BasePart") then part.CanCollide = newCanCollide end
-end
-
-for _, part in pairs(workspace:GetDescendants()) do
-    if part:IsA("BasePart") then
-        modifyCollision(part, false)
-    end
-end
+setreadonly(RawMetaTable, true)
